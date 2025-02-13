@@ -1,17 +1,8 @@
-This is a local-storage live markdown-editor that uses [markdown-it](https://github.com/markdown-it/markdown-it) and several plugins.
+# React + Vite
 
-The following plugins are currently installed:
-- [markdown-it-collapsible](https://github.com/Bioruebe/markdown-it-collapsible)
-- [markdown-it-katex](https://github.com/waylonflinn/markdown-it-katex)
-- [markdown-it-fancy-lists](https://github.com/Moxio/markdown-it-fancy-lists)
-- [markdown-it-mermaid](https://github.com/wekan/markdown-it-mermaid)
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-To add a new plugin:
+Currently, two official plugins are available:
 
-1. Run `npm install markdown-it-{plugin-name}`.
-2. Go to `src/components/MarkdownEditor.jsx` and import the plugin.
-3. Add the plugin to the `markdownIt` instance:
-
-```
-md.use(markdownItCollapsible).use(markdownItKatex).use(markdownItFancyLists).use(markdownItMermaid).use(markdownIt{Plugin});
-```
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh

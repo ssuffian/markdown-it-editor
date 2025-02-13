@@ -2,9 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import MarkdownIt from 'markdown-it';
 import markdownItCollapsible from 'markdown-it-collapsible';
 import markdownItKatex from 'markdown-it-katex';
-import markdownItFancyLists from 'markdown-it-fancy-lists';
-import markdownItMermaid from 'markdown-it-mermaid';
-
+import {markdownItFancyListPlugin} from 'markdown-it-fancy-lists';
 
 const BASE_STORAGE_KEY = 'markdown-editor-content';
 
@@ -64,7 +62,7 @@ const MarkdownEditor = () => {
       breaks: true
     });
 
-    md.use(markdownItCollapsible).use(markdownItKatex).use(markdownItFancyLists).use(markdownItMermaid);
+    md.use(markdownItCollapsible).use(markdownItKatex).use(markdownItFancyListPlugin);
 
     const content = JSON.parse(localStorage.getItem(`${BASE_STORAGE_KEY}-${filename}`) || '{}');
     const renderedHtml = md.render(content?.text || markdown);
