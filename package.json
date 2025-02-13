@@ -11,8 +11,8 @@
   "dependencies": {
     "@tailwindcss/typography": "^0.5.10",
     "katex": "^0.16.21",
-    "markdown-it": "^13.0.2",
-    "markdown-it-collapsible": "^1.0.0",
+    "markdown-it": "^14.1.0",
+    "markdown-it-collapsible": "^2.0.2",
     "markdown-it-fancy-lists": "^1.3.0",
     "markdown-it-katex": "^2.0.3",
     "react": "^18.2.0",
