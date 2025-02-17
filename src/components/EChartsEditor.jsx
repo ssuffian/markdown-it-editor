@@ -1,42 +1,73 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import MarkdownIt from 'markdown-it';
-import markdownItCollapsible from 'markdown-it-collapsible';
-import markdownItKatex from 'markdown-it-katex';
-import {markdownItFancyListPlugin} from 'markdown-it-fancy-lists';
+import React, { useState, useEffect } from 'react';
+import * as echarts from 'echarts';
 
-const BASE_STORAGE_KEY = 'markdown-editor-content';
+const BASE_STORAGE_KEY = 'echarts-editor-content';
 
-const MarkdownEditor = () => {
+const EChartsEditor = () => {
   // State management
   const [filename, setFilename] = useState(() => {
     return localStorage.getItem(`${BASE_STORAGE_KEY}-last-filename`) || 'untitled';
   });
-  const [markdown, setMarkdown] = useState(() => {
-      try {
-        const savedContent = localStorage.getItem(`${BASE_STORAGE_KEY}-${filename}`);
-        if (savedContent) {
-          const parsed = JSON.parse(savedContent);
-          return parsed.text || ``;
-        }
-      } catch (e) {
-        console.warn('Error loading saved content:', e);
+  
+  const defaultOptions = `{
+  xAxis: {},
+  yAxis: {},
+  series: [{
+    symbolSize: 20,
+    data: [[10.0, 8.04], [8.07, 6.95]],
+    type: 'scatter'
+  }]
+}`;
+
+  const [codeInput, setCodeInput] = useState(() => {
+    try {
+      const savedContent = localStorage.getItem(`${BASE_STORAGE_KEY}-${filename}`);
+      if (savedContent) {
+        const parsed = JSON.parse(savedContent);
+        return parsed.text || defaultOptions;
       }
-      return ``;
-    });
-  const [html, setHtml] = useState('');
+    } catch (e) {
+      console.warn('Error loading saved content:', e);
+    }
+    return defaultOptions;
+  });
+  
+  const [chartOptions, setChartOptions] = useState(null);
+  const [parseError, setParseError] = useState('');
   const [saveStatus, setSaveStatus] = useState('');
   const [savedFiles, setSavedFiles] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(true);
   const [lastEditTime, setLastEditTime] = useState(Date.now());
-  const [wordCount, setWordCount] = useState(0);
-  const [charCount, setCharCount] = useState(0);
+  const [chart, setChart] = useState(null);
 
-  // Load saved files and initialize markdown-it
+  // Load saved files
   useEffect(() => {
     loadSavedFiles();
-    initializeMarkdownIt();
+    const chartContainer = document.getElementById('echarts-container');
+    if (chartContainer) {
+      const newChart = echarts.init(chartContainer);
+      setChart(newChart);
+      
+      // Handle window resize
+      const handleResize = () => {
+        newChart.resize();
+      };
+      window.addEventListener('resize', handleResize);
+      
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        newChart.dispose();
+      };
+    }
   }, []);
+
+  // Update chart when options change
+  useEffect(() => {
+    if (chart && chartOptions) {
+      chart.setOption(chartOptions);
+    }
+  }, [chart, chartOptions]);
 
   const loadSavedFiles = () => {
     const files = [];
@@ -49,36 +80,15 @@ const MarkdownEditor = () => {
         files.push({ name: filename, lastModified });
       }
     }
-    // Sort by filename, most recent first
-    files.sort((a, b) => b.filename - a.filename);
+    files.sort((a, b) => b.lastModified - a.lastModified);
     setSavedFiles(files);
   };
-
-  const initializeMarkdownIt = useCallback(() => {
-    const md = new MarkdownIt({
-      html: true,
-      linkify: true,
-      typographer: true,
-      breaks: true
-    });
-
-    md.use(markdownItFancyListPlugin).use(markdownItCollapsible).use(markdownItKatex);
-
-    const content = JSON.parse(localStorage.getItem(`${BASE_STORAGE_KEY}-${filename}`) || '{}');
-    const renderedHtml = md.render(content?.text || markdown);
-    setHtml(renderedHtml);
-    
-    // Update word and character count
-    const text = content?.text || markdown;
-    setWordCount(text.trim().split(/\s+/).length);
-    setCharCount(text.length);
-  }, [filename, markdown]);
 
   // Save content periodically and when changes occur
   useEffect(() => {
     const saveContent = () => {
       const content = {
-        text: markdown,
+        text: codeInput,
         lastModified: Date.now()
       };
       localStorage.setItem(`${BASE_STORAGE_KEY}-${filename}`, JSON.stringify(content));
@@ -91,15 +101,26 @@ const MarkdownEditor = () => {
     };
 
     saveContent();
-    initializeMarkdownIt();
-  }, [markdown, filename, initializeMarkdownIt]);
+    
+    try {
+      // Evaluate the code input as JavaScript object
+      // eslint-disable-next-line no-new-func
+      const evalFunction = new Function(`return ${codeInput}`);
+      const options = evalFunction();
+      setChartOptions(options);
+      setParseError('');
+    } catch (e) {
+      setParseError('Invalid ECharts configuration');
+      console.error(e);
+    }
+  }, [codeInput, filename]);
 
   // Auto-save every 30 seconds if changes were made
   useEffect(() => {
     const autoSaveInterval = setInterval(() => {
       if (Date.now() - lastEditTime < 30000) {
         const content = {
-          text: markdown,
+          text: codeInput,
           lastModified: Date.now()
         };
         localStorage.setItem(`${BASE_STORAGE_KEY}-${filename}`, JSON.stringify(content));
@@ -109,10 +130,10 @@ const MarkdownEditor = () => {
     }, 30000);
 
     return () => clearInterval(autoSaveInterval);
-  }, [markdown, filename, lastEditTime]);
+  }, [codeInput, filename, lastEditTime]);
 
   const handleEditorChange = (e) => {
-    setMarkdown(e.target.value);
+    setCodeInput(e.target.value);
     setLastEditTime(Date.now());
   };
 
@@ -120,7 +141,7 @@ const MarkdownEditor = () => {
     const newFilename = e.target.value.trim();
     if (newFilename && newFilename !== filename) {
       const content = {
-        text: markdown,
+        text: codeInput,
         lastModified: Date.now()
       };
       localStorage.setItem(`${BASE_STORAGE_KEY}-${newFilename}`, JSON.stringify(content));
@@ -133,19 +154,19 @@ const MarkdownEditor = () => {
   const handleFileClick = (selectedFile) => {
     const content = JSON.parse(localStorage.getItem(`${BASE_STORAGE_KEY}-${selectedFile.name}`) || '{}');
     setFilename(selectedFile.name);
-    setMarkdown(content.text || '');
+    setCodeInput(content.text || defaultOptions);
     setLastEditTime(Date.now());
   };
 
   const handleNewFile = () => {
     const newFilename = `untitled-${Date.now()}`;
     const content = {
-      text: '',
+      text: defaultOptions,
       lastModified: Date.now()
     };
     localStorage.setItem(`${BASE_STORAGE_KEY}-${newFilename}`, JSON.stringify(content));
     setFilename(newFilename);
-    setMarkdown('');
+    setCodeInput(defaultOptions);
     setLastEditTime(Date.now());
     loadSavedFiles();
   };
@@ -161,11 +182,11 @@ const MarkdownEditor = () => {
   };
 
   const handleExport = () => {
-    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const blob = new Blob([codeInput], { type: 'application/javascript' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${filename}.md`;
+    a.download = `${filename}.js`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -263,13 +284,10 @@ const MarkdownEditor = () => {
                   placeholder="Filename"
                   aria-label="Filename"
                 />
-                <span className="text-sm text-gray-500">.md</span>
+                <span className="text-sm text-gray-500">.js</span>
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <div className="text-sm text-gray-500">
-                {wordCount} words | {charCount} characters
-              </div>
               <span className="text-sm text-green-600">{saveStatus}</span>
               <button
                 onClick={handleExport}
@@ -288,59 +306,30 @@ const MarkdownEditor = () => {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="border rounded-lg p-4">
-              <h2 className="text-lg font-semibold mb-2">Editor</h2>
+              <h2 className="text-lg font-semibold mb-2">ECharts Configuration</h2>
               <textarea
                 className="w-full h-[calc(100vh-300px)] p-2 border rounded font-mono"
-                value={markdown}
+                value={codeInput}
                 onChange={handleEditorChange}
-                placeholder="Enter your markdown here..."
+                placeholder="Enter your ECharts configuration here..."
               />
+              {parseError && (
+                <div className="text-red-500 mt-2 text-sm">{parseError}</div>
+              )}
             </div>
 
             <div className="border rounded-lg p-4">
-              <h2 className="text-lg font-semibold mb-2">Preview</h2>
+              <h2 className="text-lg font-semibold mb-2">Chart Preview</h2>
               <div 
-                className="prose max-w-none h-[calc(100vh-300px)] overflow-auto"
-                dangerouslySetInnerHTML={{ __html: html }}
+                id="echarts-container" 
+                className="w-full h-[calc(100vh-300px)]"
               />
             </div>
           </div>
         </div>
       </div>
-
-      <style jsx global>{`
-        .collapsible {
-          border: 1px solid #ddd;
-          border-radius: 4px;
-          margin: 8px 0;
-        }
-        
-        .collapsible-header {
-          background-color: #f5f5f5;
-          padding: 8px 16px;
-          cursor: pointer;
-          user-select: none;
-        }
-        
-        .collapsible-header:hover {
-          background-color: #eeeeee;
-        }
-        
-        .collapsible-content {
-          padding: 8px 16px;
-          display: none;
-        }
-        
-        .collapsible.is-open .collapsible-content {
-          display: block;
-        }
-
-        .text-green-600 {
-          transition: opacity 0.3s ease-in-out;
-        }
-      `}</style>
     </div>
   );
 };
 
-export default MarkdownEditor;
+export default EChartsEditor;
